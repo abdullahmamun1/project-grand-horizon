@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useSearch, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format, differenceInDays } from "date-fns";
 import {
   ArrowLeft,
@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
+import PaymentForm from "@/components/PaymentForm";
 import type { Room, InsertBooking } from "@shared/schema";
 
 interface BookingResponse {
@@ -58,6 +59,7 @@ export default function Booking() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const params = new URLSearchParams(search);
   const roomId = params.get("roomId");
@@ -75,6 +77,7 @@ export default function Booking() {
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [appliedPromo, setAppliedPromo] = useState<PromoValidationResult | null>(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
+  const [isProcessingRedirect, setIsProcessingRedirect] = useState(false);
 
   const { data: room, isLoading: isLoadingRoom } = useQuery<Room>({
     queryKey: [`/api/rooms/${roomId}`],
@@ -104,6 +107,7 @@ export default function Booking() {
     },
     onSuccess: () => {
       setStep("confirmation");
+      queryClient.invalidateQueries({ queryKey: ['/api/bookings/my'] });
       toast({
         title: "Booking Confirmed!",
         description: "Your booking has been successfully confirmed. Check your email for details.",
@@ -123,6 +127,87 @@ export default function Booking() {
       setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname + window.location.search));
     }
   }, [isAuthenticated, setLocation]);
+
+  // Handle Stripe 3DS redirect completion
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentIntentParam = urlParams.get('payment_intent');
+    const redirectStatus = urlParams.get('redirect_status');
+    const bookingIdParam = urlParams.get('bookingId');
+
+    if (paymentIntentParam && redirectStatus && bookingIdParam && user) {
+      setIsProcessingRedirect(true);
+      setBookingId(bookingIdParam);
+      setStep("payment");
+
+      const cleanUrlParams = () => {
+        const cleanUrl = window.location.pathname + '?' + new URLSearchParams({
+          roomId: roomId || '',
+          checkIn: checkInParam || '',
+          checkOut: checkOutParam || '',
+          guests: guestsParam || '',
+        }).toString();
+        window.history.replaceState({}, '', cleanUrl);
+      };
+
+      // First fetch the booking to verify ownership
+      api.get<{ _id: string; userId: string; status: string }>(`/bookings/${bookingIdParam}`)
+        .then((booking) => {
+          // Verify booking belongs to current user (backend also validates this)
+          if (booking.userId !== user._id) {
+            throw new Error('Booking not found');
+          }
+
+          // If already confirmed, skip to confirmation step
+          if (booking.status === 'confirmed') {
+            setStep("confirmation");
+            setIsProcessingRedirect(false);
+            cleanUrlParams();
+            return;
+          }
+
+          if (redirectStatus === 'succeeded') {
+            // Payment succeeded via 3DS, confirm the booking
+            return api.post<{ success: boolean }>(`/bookings/${bookingIdParam}/confirm-payment`)
+              .then(() => {
+                setStep("confirmation");
+                setIsProcessingRedirect(false);
+                queryClient.invalidateQueries({ queryKey: ['/api/bookings/my'] });
+                toast({
+                  title: "Booking Confirmed!",
+                  description: "Your payment was successful and booking has been confirmed.",
+                });
+                cleanUrlParams();
+              })
+              .catch((error: any) => {
+                toast({
+                  title: "Payment Confirmation Failed",
+                  description: error.message || "Please refresh and try again.",
+                  variant: "destructive",
+                });
+                setIsProcessingRedirect(false);
+              });
+          } else {
+            // Payment failed - keep URL params so user can retry
+            toast({
+              title: "Payment Failed",
+              description: "The payment was not successful. Please try again.",
+              variant: "destructive",
+            });
+            setIsProcessingRedirect(false);
+          }
+        })
+        .catch((error: any) => {
+          // Keep URL params on error so user can retry
+          toast({
+            title: "Payment Confirmation Failed",
+            description: error.message || "Please refresh and try again.",
+            variant: "destructive",
+          });
+          setIsProcessingRedirect(false);
+        });
+    }
+  }, [roomId, checkInParam, checkOutParam, guestsParam, toast, user, queryClient]);
 
   if (!roomId || !checkIn || !checkOut) {
     return (
@@ -442,7 +527,7 @@ export default function Booking() {
               </Card>
             )}
 
-            {step === "payment" && (
+            {step === "payment" && bookingId && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -451,39 +536,44 @@ export default function Booking() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      This is a test environment. No real payment will be processed.
-                      Click "Confirm Payment" to simulate a successful payment.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="p-6 border rounded-lg bg-muted/50">
-                    <p className="text-center text-muted-foreground mb-4">
-                      Stripe Payment Form would appear here in production
-                    </p>
-                    <div className="space-y-4">
-                      <div className="h-10 bg-muted rounded-md" />
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="h-10 bg-muted rounded-md" />
-                        <div className="h-10 bg-muted rounded-md" />
-                      </div>
+                  {isProcessingRedirect ? (
+                    <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      <p className="text-muted-foreground">Processing your payment...</p>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          This is a test environment. Use card number <strong>4242 4242 4242 4242</strong> with any future expiry date and any CVC.
+                        </AlertDescription>
+                      </Alert>
 
-                  <Button
-                    className="w-full"
-                    size="lg"
-                    onClick={handleConfirmPayment}
-                    disabled={confirmPaymentMutation.isPending}
-                    data-testid="button-confirm-payment"
-                  >
-                    {confirmPaymentMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Confirm Payment (${finalPrice.toFixed(2)})
-                  </Button>
+                      <PaymentForm
+                        bookingId={bookingId}
+                        amount={finalPrice}
+                        onSuccess={() => {
+                          if (!bookingId) {
+                            toast({
+                              title: "Error",
+                              description: "Booking ID not found. Please refresh and try again.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          confirmPaymentMutation.mutate();
+                        }}
+                        onError={(error) => {
+                          toast({
+                            title: "Payment Error",
+                            description: error,
+                            variant: "destructive",
+                          });
+                        }}
+                      />
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}

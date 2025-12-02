@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { Booking, Room, User, PromoCode } from '../db/models';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendBookingConfirmation } from '../services/email';
+import { createPaymentIntent, verifyPaymentIntent, getStripePublishableKey } from '../services/stripe';
 import { z } from 'zod';
 
 // Helper function to validate and calculate promo code discount
@@ -56,6 +57,17 @@ async function validatePromoCode(code: string, bookingAmount: number) {
 }
 
 const router = Router();
+
+// Get Stripe publishable key (no auth required for this)
+router.get('/stripe-key', async (_req, res: Response) => {
+  try {
+    const publishableKey = await getStripePublishableKey();
+    res.json({ publishableKey });
+  } catch (error) {
+    console.error('Error getting Stripe key:', error);
+    res.status(500).json({ message: 'Payment service unavailable' });
+  }
+});
 
 const createBookingSchema = z.object({
   roomId: z.string(),
@@ -241,6 +253,46 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Create a payment intent for a booking
+router.post('/:id/create-payment-intent', async (req: AuthRequest, res: Response) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      userId: req.user!._id,
+    });
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    if (booking.status !== 'pending') {
+      return res.status(400).json({ message: 'Booking is not in pending status' });
+    }
+
+    if (booking.paymentStatus === 'paid') {
+      return res.status(400).json({ message: 'Booking is already paid' });
+    }
+
+    // Use finalPrice if promo was applied, otherwise totalPrice
+    const amount = booking.finalPrice || booking.totalPrice;
+
+    const { clientSecret, paymentIntentId } = await createPaymentIntent(
+      amount,
+      booking._id.toString(),
+      req.user!.email
+    );
+
+    // Store the payment intent ID on the booking
+    booking.paymentIntentId = paymentIntentId;
+    await booking.save();
+
+    res.json({ clientSecret, paymentIntentId });
+  } catch (error) {
+    console.error('Error creating payment intent:', error);
+    res.status(500).json({ message: 'Failed to create payment intent' });
+  }
+});
+
 router.post('/:id/confirm-payment', async (req: AuthRequest, res: Response) => {
   try {
     const booking = await Booking.findOne({
@@ -252,9 +304,66 @@ router.post('/:id/confirm-payment', async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
+    // Check if already confirmed
+    if (booking.paymentStatus === 'paid') {
+      return res.json({ success: true, booking: booking.toJSON() });
+    }
+
+    // Verify the payment with Stripe - payment intent is required
+    if (!booking.paymentIntentId) {
+      return res.status(400).json({ 
+        message: 'No payment intent found. Please initiate payment first.' 
+      });
+    }
+
+    // Verify with Stripe that payment succeeded
+    try {
+      const paymentIntent = await verifyPaymentIntent(booking.paymentIntentId);
+      
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ 
+          message: 'Payment has not been completed',
+          paymentStatus: paymentIntent.status 
+        });
+      }
+
+      // Verify the payment intent matches this booking
+      const expectedBookingId = booking._id.toString();
+      if (paymentIntent.metadata?.bookingId !== expectedBookingId) {
+        console.error(`Payment intent booking ID mismatch: expected ${expectedBookingId}, got ${paymentIntent.metadata?.bookingId}`);
+        return res.status(400).json({ 
+          message: 'Payment verification failed: booking mismatch' 
+        });
+      }
+
+      // Verify the amount matches (convert booking price to cents)
+      const expectedAmount = Math.round((booking.finalPrice || booking.totalPrice) * 100);
+      const actualAmount = paymentIntent.amount_received || paymentIntent.amount;
+      if (actualAmount !== expectedAmount) {
+        console.error(`Payment amount mismatch: expected ${expectedAmount}, got ${actualAmount}`);
+        return res.status(400).json({ 
+          message: 'Payment verification failed: amount mismatch' 
+        });
+      }
+
+      // Verify currency matches
+      if (paymentIntent.currency !== 'usd') {
+        console.error(`Payment currency mismatch: expected usd, got ${paymentIntent.currency}`);
+        return res.status(400).json({ 
+          message: 'Payment verification failed: currency mismatch' 
+        });
+      }
+    } catch (stripeError: any) {
+      console.error('Error verifying payment with Stripe:', stripeError);
+      return res.status(400).json({ 
+        message: 'Payment verification failed. Please try again or contact support.',
+        error: stripeError.message 
+      });
+    }
+
+    // Payment verified - update booking status
     booking.status = 'confirmed';
     booking.paymentStatus = 'paid';
-    booking.paymentIntentId = `pi_simulated_${Date.now()}`;
     await booking.save();
 
     const room = await Room.findById(booking.roomId);

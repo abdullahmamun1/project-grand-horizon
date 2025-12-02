@@ -156,6 +156,16 @@ Preferred communication style: Simple, everyday language.
 - **Multer**: Multipart form data and file uploads
 
 ### Payment Integration
-- Stripe integration for payment processing (test mode)
-- Payment-related fields in booking model (paymentIntentId, paymentStatus)
-- Simulated payment flow in development with actual Stripe in production
+- **Stripe Elements**: Real payment form using @stripe/react-stripe-js and @stripe/stripe-js
+- **Payment Flow**:
+  1. User creates booking (status: pending)
+  2. Frontend requests payment intent from `/api/bookings/:id/create-payment-intent`
+  3. User enters card details in Stripe Elements form
+  4. On success, frontend calls `/api/bookings/:id/confirm-payment`
+  5. Backend verifies payment with Stripe before confirming booking
+- **Stripe Service** (server/services/stripe.ts):
+  - Fetches credentials from Replit connector API
+  - Creates PaymentIntent for booking amounts
+  - Verifies payment status before confirmation
+- **Test Card**: 4242 4242 4242 4242 (any future expiry, any CVC)
+- Payment-related fields in booking model: paymentIntentId, paymentStatus

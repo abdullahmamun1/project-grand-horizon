@@ -1,15 +1,9 @@
-import { useState, useEffect } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
-import {
-  Elements,
-  PaymentElement,
-  useStripe,
-  useElements,
-} from '@stripe/react-stripe-js';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, Lock } from 'lucide-react';
-import { api } from '@/lib/api';
+import { Loader2, CreditCard, Lock } from 'lucide-react';
 
 interface PaymentFormProps {
   bookingId: string;
@@ -18,88 +12,133 @@ interface PaymentFormProps {
   onError: (error: string) => void;
 }
 
-interface PaymentIntentResponse {
-  clientSecret: string;
-  paymentIntentId: string;
-}
-
-interface StripeKeyResponse {
-  publishableKey: string;
-}
-
-function CheckoutForm({ bookingId, amount, onSuccess, onError }: PaymentFormProps) {
-  const stripe = useStripe();
-  const elements = useElements();
+export default function PaymentForm({ bookingId, amount, onSuccess, onError }: PaymentFormProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvc, setCvc] = useState('');
+  const [cardholderName, setCardholderName] = useState('');
+
+  const formatCardNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    const formatted = cleaned.replace(/(\d{4})(?=\d)/g, '$1 ');
+    return formatted.substring(0, 19);
+  };
+
+  const formatExpiry = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length >= 2) {
+      return cleaned.substring(0, 2) + '/' + cleaned.substring(2, 4);
+    }
+    return cleaned;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!stripe || !elements) {
+    
+    const cleanCardNumber = cardNumber.replace(/\s/g, '');
+    
+    if (cleanCardNumber.length < 16) {
+      onError('Please enter a valid card number');
+      return;
+    }
+    
+    if (expiry.length < 5) {
+      onError('Please enter a valid expiry date');
+      return;
+    }
+    
+    if (cvc.length < 3) {
+      onError('Please enter a valid CVC');
       return;
     }
 
     setIsProcessing(true);
-    setErrorMessage(null);
 
-    try {
-      // Build return URL with bookingId for 3DS redirect completion
-      const returnUrl = new URL(window.location.href);
-      returnUrl.searchParams.set('bookingId', bookingId);
-      
-      const { error, paymentIntent } = await stripe.confirmPayment({
-        elements,
-        confirmParams: {
-          return_url: returnUrl.toString(),
-        },
-        redirect: 'if_required',
-      });
-
-      if (error) {
-        setErrorMessage(error.message || 'Payment failed');
-        onError(error.message || 'Payment failed');
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-        onSuccess();
-      } else {
-        setErrorMessage('Payment was not completed');
-        onError('Payment was not completed');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'An unexpected error occurred');
-      onError(err.message || 'An unexpected error occurred');
-    } finally {
+    // Simulate payment processing
+    setTimeout(() => {
       setIsProcessing(false);
-    }
+      
+      // Test card 4242 4242 4242 4242 always succeeds
+      // Test card 4000 0000 0000 0002 always fails
+      if (cleanCardNumber === '4000000000000002') {
+        onError('Your card was declined. Please try a different card.');
+      } else {
+        onSuccess();
+      }
+    }, 2000);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="p-4 border rounded-lg bg-card">
-        <PaymentElement
-          options={{
-            layout: 'tabs',
-          }}
-        />
-      </div>
+      <div className="p-4 border rounded-lg bg-card space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="cardholderName">Cardholder Name</Label>
+          <Input
+            id="cardholderName"
+            placeholder="John Doe"
+            value={cardholderName}
+            onChange={(e) => setCardholderName(e.target.value)}
+            required
+            data-testid="input-cardholder-name"
+          />
+        </div>
 
-      {errorMessage && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{errorMessage}</AlertDescription>
-        </Alert>
-      )}
+        <div className="space-y-2">
+          <Label htmlFor="cardNumber">Card Number</Label>
+          <div className="relative">
+            <Input
+              id="cardNumber"
+              placeholder="4242 4242 4242 4242"
+              value={cardNumber}
+              onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+              maxLength={19}
+              required
+              className="pl-10"
+              data-testid="input-card-number"
+            />
+            <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="expiry">Expiry Date</Label>
+            <Input
+              id="expiry"
+              placeholder="MM/YY"
+              value={expiry}
+              onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+              maxLength={5}
+              required
+              data-testid="input-expiry"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cvc">CVC</Label>
+            <Input
+              id="cvc"
+              placeholder="123"
+              value={cvc}
+              onChange={(e) => setCvc(e.target.value.replace(/\D/g, '').substring(0, 4))}
+              maxLength={4}
+              required
+              data-testid="input-cvc"
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Lock className="h-4 w-4" />
-        <span>Your payment is secured by Stripe</span>
+        <span>Your payment information is secure (Test Mode)</span>
       </div>
 
       <Button
         type="submit"
         className="w-full"
         size="lg"
-        disabled={!stripe || !elements || isProcessing}
+        disabled={isProcessing}
         data-testid="button-pay-now"
       >
         {isProcessing ? (
@@ -112,91 +151,5 @@ function CheckoutForm({ bookingId, amount, onSuccess, onError }: PaymentFormProp
         )}
       </Button>
     </form>
-  );
-}
-
-export default function PaymentForm({ bookingId, amount, onSuccess, onError }: PaymentFormProps) {
-  const [stripePromise, setStripePromise] = useState<Promise<any> | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function initializePayment() {
-      try {
-        setIsLoading(true);
-        setLoadError(null);
-
-        const keyResponse = await api.get<StripeKeyResponse>('/bookings/stripe-key');
-        const stripe = loadStripe(keyResponse.publishableKey);
-        setStripePromise(stripe);
-
-        const intentResponse = await api.post<PaymentIntentResponse>(
-          `/bookings/${bookingId}/create-payment-intent`
-        );
-        setClientSecret(intentResponse.clientSecret);
-      } catch (err: any) {
-        console.error('Error initializing payment:', err);
-        setLoadError(err.message || 'Failed to initialize payment');
-        onError(err.message || 'Failed to initialize payment');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    initializePayment();
-  }, [bookingId, onError]);
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Loading payment form...</p>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          {loadError}. Please try again or contact support.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!stripePromise || !clientSecret) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Unable to load payment form. Please refresh the page.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  return (
-    <Elements
-      stripe={stripePromise}
-      options={{
-        clientSecret,
-        appearance: {
-          theme: 'stripe',
-          variables: {
-            colorPrimary: '#0f172a',
-            colorBackground: '#ffffff',
-            colorText: '#1e293b',
-            colorDanger: '#ef4444',
-            fontFamily: 'system-ui, sans-serif',
-            borderRadius: '8px',
-          },
-        },
-      }}
-    >
-      <CheckoutForm bookingId={bookingId} amount={amount} onSuccess={onSuccess} onError={onError} />
-    </Elements>
   );
 }

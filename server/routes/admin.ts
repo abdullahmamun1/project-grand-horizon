@@ -58,18 +58,19 @@ router.get('/room-stats', async (req: AuthRequest, res: Response) => {
     const rooms = await Room.find().lean();
     const occupiedBookings = await Booking.find({ status: 'checked_in' }).lean();
     
-    const occupiedRoomIds = new Set(
+    const occupiedRoomIdsSet = new Set(
       occupiedBookings.map((b) => b.roomId.toString())
     );
+    const occupiedRoomIds = Array.from(occupiedRoomIdsSet);
 
     const categories = ['Standard', 'Deluxe', 'Suite', 'Executive', 'Presidential', 'Family', 'Penthouse'];
     
     const statsByCategory = categories.map((category) => {
       const categoryRooms = rooms.filter((r) => r.category === category);
       const totalRooms = categoryRooms.length;
-      const occupiedRooms = categoryRooms.filter((r) => occupiedRoomIds.has(r._id.toString())).length;
+      const occupiedRooms = categoryRooms.filter((r) => occupiedRoomIdsSet.has(r._id.toString())).length;
       const availableRooms = categoryRooms.filter(
-        (r) => r.isAvailable && !occupiedRoomIds.has(r._id.toString())
+        (r) => r.isAvailable && !occupiedRoomIdsSet.has(r._id.toString())
       ).length;
 
       return {
@@ -82,11 +83,11 @@ router.get('/room-stats', async (req: AuthRequest, res: Response) => {
 
     const totals = {
       totalRooms: rooms.length,
-      availableRooms: rooms.filter((r) => r.isAvailable && !occupiedRoomIds.has(r._id.toString())).length,
-      occupiedRooms: occupiedRoomIds.size,
+      availableRooms: rooms.filter((r) => r.isAvailable && !occupiedRoomIdsSet.has(r._id.toString())).length,
+      occupiedRooms: occupiedRoomIdsSet.size,
     };
 
-    res.json({ statsByCategory, totals });
+    res.json({ statsByCategory, totals, occupiedRoomIds });
   } catch (error) {
     console.error('Error fetching room stats:', error);
     res.status(500).json({ message: 'Failed to fetch room statistics' });

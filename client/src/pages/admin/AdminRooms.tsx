@@ -89,6 +89,7 @@ interface RoomStats {
     availableRooms: number;
     occupiedRooms: number;
   };
+  occupiedRoomIds: string[];
 }
 
 export default function AdminRooms() {
@@ -461,9 +462,19 @@ export default function AdminRooms() {
                     <TableCell>{room.capacity}</TableCell>
                     <TableCell>${room.pricePerNight}</TableCell>
                     <TableCell>
-                      <Badge variant={room.isAvailable ? "default" : "secondary"}>
-                        {room.isAvailable ? "Available" : "Unavailable"}
-                      </Badge>
+                      {roomStats?.occupiedRoomIds?.includes(room._id) ? (
+                        <Badge variant="destructive" data-testid={`status-occupied-${room._id}`}>
+                          Occupied
+                        </Badge>
+                      ) : room.isAvailable ? (
+                        <Badge variant="default" data-testid={`status-available-${room._id}`}>
+                          Available
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" data-testid={`status-unavailable-${room._id}`}>
+                          Unavailable
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">

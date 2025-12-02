@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Hotel, LayoutDashboard, BedDouble, Calendar, LogOut } from "lucide-react";
+import { Hotel, LayoutDashboard, BedDouble, Calendar, LogOut, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -26,6 +26,7 @@ const adminNavItems = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/admin/rooms", icon: BedDouble, label: "Rooms" },
   { href: "/admin/bookings", icon: Calendar, label: "Bookings" },
+  { href: "/admin/promo-codes", icon: Tag, label: "Promo Codes" },
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {

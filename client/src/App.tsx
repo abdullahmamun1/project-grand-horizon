@@ -21,6 +21,7 @@ import { AdminLayout } from "@/pages/admin/AdminLayout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminRooms from "@/pages/admin/AdminRooms";
 import AdminBookings from "@/pages/admin/AdminBookings";
+import AdminPromoCodes from "@/pages/admin/AdminPromoCodes";
 import { ManagerLayout } from "@/pages/manager/ManagerLayout";
 import ManagerDashboard from "@/pages/manager/ManagerDashboard";
 import ManagerBookings from "@/pages/manager/ManagerBookings";
@@ -99,6 +100,13 @@ function Router() {
         <ProtectedRoute requiredRole="admin">
           <AdminLayout>
             <AdminBookings />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/promo-codes">
+        <ProtectedRoute requiredRole="admin">
+          <AdminLayout>
+            <AdminPromoCodes />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

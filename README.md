@@ -75,70 +75,113 @@ The system supports flexible promo codes with:
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- MongoDB Atlas account (or local MongoDB instance)
-- Gmail account for SMTP email (or other SMTP provider)
-- Stripe account for payment processing (optional for testing)
+- **Node.js 18 or higher** - Download from [nodejs.org](https://nodejs.org/)
+- **Git** - Download from [git-scm.com](https://git-scm.com/download/win)
+- **MongoDB Atlas account** (free tier available) - Sign up at [mongodb.com/atlas](https://www.mongodb.com/atlas)
+- **Gmail account** for SMTP email notifications (or other SMTP provider)
+- **Stripe account** for payment processing (optional) - Sign up at [stripe.com](https://stripe.com)
 
-### Environment Variables
+---
 
-Create a `.env` file in the root directory or set these in your hosting platform's secrets:
+## Running Locally on Windows
 
-#### Required Variables
+### Step 1: Install Prerequisites
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `MONGODB_URI` | MongoDB connection string | `mongodb+srv://user:pass@cluster.mongodb.net/hotel?retryWrites=true&w=majority` |
-| `SESSION_SECRET` | Secret key for session encryption (min 32 chars) | `your-super-secret-session-key-here-min-32-chars` |
+1. **Install Node.js:**
+   - Download the Windows installer from [nodejs.org](https://nodejs.org/) (LTS version recommended)
+   - Run the installer and follow the prompts
+   - Verify installation by opening Command Prompt or PowerShell:
+     ```cmd
+     node --version
+     npm --version
+     ```
 
-#### Email Configuration (Required for email notifications)
+2. **Install Git:**
+   - Download from [git-scm.com](https://git-scm.com/download/win)
+   - Run the installer (default options are fine)
+   - Verify installation:
+     ```cmd
+     git --version
+     ```
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SMTP_HOST` | SMTP server hostname | `smtp.gmail.com` |
-| `SMTP_PORT` | SMTP server port | `587` |
-| `SMTP_USER` | SMTP username/email | `your-email@gmail.com` |
-| `SMTP_PASS` | SMTP password or app password | `your-app-password` |
+### Step 2: Set Up MongoDB Atlas (Free Cloud Database)
 
-> **Gmail Setup:** For Gmail, you need to use an "App Password" instead of your regular password. Go to Google Account → Security → 2-Step Verification → App passwords to generate one.
-
-#### Payment Configuration (Optional)
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `STRIPE_SECRET_KEY` | Stripe API secret key | `sk_test_...` |
-| `VITE_STRIPE_PUBLIC_KEY` | Stripe publishable key (frontend) | `pk_test_...` |
-
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd grand-horizon-hotel
+1. Go to [mongodb.com/atlas](https://www.mongodb.com/atlas) and create a free account
+2. Create a new cluster (free tier M0 is sufficient)
+3. Click **"Connect"** on your cluster
+4. Choose **"Connect your application"**
+5. Copy the connection string (looks like: `mongodb+srv://username:<password>@cluster0.xxxxx.mongodb.net/`)
+6. Replace `<password>` with your actual database user password
+7. Add `/hotel` before the `?` to specify the database name:
+   ```
+   mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/hotel?retryWrites=true&w=majority
    ```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+**Important:** In MongoDB Atlas, go to **Network Access** and either:
+- Add your current IP address, OR
+- Add `0.0.0.0/0` to allow access from anywhere (for development)
 
-3. **Set up environment variables:**
-   - Copy `.env.example` to `.env`
-   - Fill in your actual values
+### Step 3: Set Up Gmail for Email Notifications
 
-4. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
+1. Go to your [Google Account Security Settings](https://myaccount.google.com/security)
+2. Enable **2-Step Verification** if not already enabled
+3. Go to **App passwords** (under 2-Step Verification)
+4. Select **Mail** and **Windows Computer**
+5. Click **Generate** and copy the 16-character password
+6. Use this password as your `SMTP_PASS` (not your regular Gmail password)
 
-5. **Access the application:**
-   - Open your browser to `http://localhost:5000`
+### Step 4: Clone and Set Up the Project
 
-### Seeding Sample Data
+Open Command Prompt or PowerShell and run:
 
-To populate the database with sample rooms, users, bookings, and reviews:
+```cmd
+# Clone the repository
+git clone <repository-url>
+cd grand-horizon-hotel
 
-```bash
+# Install dependencies
+npm install
+
+# Create environment file
+copy .env.example .env
+```
+
+### Step 5: Configure Environment Variables
+
+Open the `.env` file in a text editor (Notepad, VS Code, etc.) and fill in your values:
+
+```env
+# Database (Required)
+MONGODB_URI=mongodb+srv://your-username:your-password@cluster0.xxxxx.mongodb.net/hotel?retryWrites=true&w=majority
+
+# Session Secret (Required) - Any random string 32+ characters
+SESSION_SECRET=your-super-secret-key-at-least-32-characters-long
+
+# Email Configuration (Required for booking confirmations)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-16-char-app-password
+
+# Stripe (Optional - for payments)
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_public_key
+```
+
+### Step 6: Run the Application
+
+```cmd
+# Start the development server
+npm run dev
+```
+
+The application will start and be available at: **http://localhost:5000**
+
+### Step 7: Seed Sample Data (Optional)
+
+To populate the database with sample rooms, users, and bookings:
+
+```cmd
 npx tsx server/scripts/seed.ts
 ```
 
@@ -148,6 +191,33 @@ This creates:
 - 5 sample customer accounts with booking history
 - Sample bookings with various statuses
 - Sample reviews for rooms
+
+---
+
+## Environment Variables Reference
+
+### Required Variables
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `MONGODB_URI` | MongoDB connection string | `mongodb+srv://user:pass@cluster.mongodb.net/hotel?retryWrites=true&w=majority` |
+| `SESSION_SECRET` | Secret key for session encryption (min 32 chars) | `my-super-secret-session-key-here` |
+
+### Email Configuration
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SMTP_HOST` | SMTP server hostname | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP username/email | `your-email@gmail.com` |
+| `SMTP_PASS` | SMTP password or app password | `your-app-password` |
+
+### Payment Configuration (Optional)
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `STRIPE_SECRET_KEY` | Stripe API secret key | `sk_test_...` |
+| `VITE_STRIPE_PUBLIC_KEY` | Stripe publishable key (frontend) | `pk_test_...` |
 
 ---
 

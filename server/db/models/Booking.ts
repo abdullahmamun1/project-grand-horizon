@@ -7,6 +7,9 @@ export interface IBooking extends Document {
   checkInDate: Date;
   checkOutDate: Date;
   totalPrice: number;
+  discountAmount: number;
+  finalPrice: number;
+  promoCode?: string;
   status: 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled';
   guestCount: number;
   specialRequests?: string;
@@ -38,6 +41,19 @@ const bookingSchema = new Schema<IBooking>({
     type: Number,
     required: true,
     min: 0,
+  },
+  discountAmount: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  finalPrice: {
+    type: Number,
+    required: true,
+    min: 0,
+  },
+  promoCode: {
+    type: String,
   },
   status: {
     type: String,

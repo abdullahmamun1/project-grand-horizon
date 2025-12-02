@@ -106,6 +106,9 @@ export const bookingSchema = z.object({
   checkInDate: z.date(),
   checkOutDate: z.date(),
   totalPrice: z.number().positive(),
+  discountAmount: z.number().min(0).default(0),
+  finalPrice: z.number().positive(),
+  promoCode: z.string().optional(),
   status: z.enum(bookingStatuses).default("pending"),
   guestCount: z.number().int().positive(),
   specialRequests: z.string().optional(),
@@ -134,6 +137,31 @@ export const insertReviewSchema = reviewSchema.omit({ _id: true, createdAt: true
 
 export type Review = z.infer<typeof reviewSchema>;
 export type InsertReview = z.infer<typeof insertReviewSchema>;
+
+// ============ PROMO CODE SCHEMA ============
+export const discountTypes = ["percentage", "fixed"] as const;
+export type DiscountType = (typeof discountTypes)[number];
+
+export const promoCodeSchema = z.object({
+  _id: z.string(),
+  code: z.string().min(3).max(20),
+  description: z.string().optional(),
+  discountType: z.enum(discountTypes),
+  discountValue: z.number().positive(),
+  minBookingAmount: z.number().min(0).default(0),
+  maxDiscountAmount: z.number().positive().optional(),
+  validFrom: z.date(),
+  validTo: z.date(),
+  usageLimit: z.number().int().positive().optional(),
+  usageCount: z.number().int().min(0).default(0),
+  isActive: z.boolean().default(true),
+  createdAt: z.date(),
+});
+
+export const insertPromoCodeSchema = promoCodeSchema.omit({ _id: true, createdAt: true, usageCount: true });
+
+export type PromoCode = z.infer<typeof promoCodeSchema>;
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
 
 // ============ API RESPONSE TYPES ============
 export interface AuthResponse {

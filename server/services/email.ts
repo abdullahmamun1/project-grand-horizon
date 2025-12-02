@@ -6,7 +6,10 @@ import { IUser } from '../db/models/User';
 let transporter: nodemailer.Transporter | null = null;
 
 function getTransporter() {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  const smtpUser = process.env.SMTP_USER?.trim();
+  const smtpPass = process.env.SMTP_PASS?.trim();
+  
+  if (!smtpUser || !smtpPass) {
     return null;
   }
   
@@ -16,8 +19,8 @@ function getTransporter() {
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: false,
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: smtpUser,
+        pass: smtpPass,
       },
     });
   }

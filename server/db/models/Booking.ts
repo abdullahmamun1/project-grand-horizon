@@ -49,7 +49,6 @@ const bookingSchema = new Schema<IBooking>({
   },
   finalPrice: {
     type: Number,
-    required: true,
     min: 0,
   },
   promoCode: {
@@ -85,6 +84,13 @@ const bookingSchema = new Schema<IBooking>({
 bookingSchema.index({ userId: 1 });
 bookingSchema.index({ roomId: 1 });
 bookingSchema.index({ checkInDate: 1, checkOutDate: 1 });
+
+// Pre-save hook to set finalPrice to totalPrice if not set
+bookingSchema.pre('save', function() {
+  if (this.finalPrice === undefined || this.finalPrice === null) {
+    this.finalPrice = this.totalPrice - (this.discountAmount || 0);
+  }
+});
 
 bookingSchema.set('toJSON', {
   transform: function (doc, ret) {

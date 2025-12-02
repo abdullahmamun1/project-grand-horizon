@@ -75,7 +75,7 @@ const promoCodeSchema = new Schema<IPromoCode>({
   },
 });
 
-promoCodeSchema.index({ code: 1 });
+// Note: code field already has unique: true which creates an index
 promoCodeSchema.index({ isActive: 1, validFrom: 1, validTo: 1 });
 
 promoCodeSchema.set('toJSON', {

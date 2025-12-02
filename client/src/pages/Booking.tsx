@@ -11,6 +11,8 @@ import {
   Loader2,
   AlertCircle,
   Bed,
+  Tag,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -28,9 +32,23 @@ interface BookingResponse {
     _id: string;
     status: string;
     totalPrice: number;
+    discountAmount: number;
+    finalPrice: number;
+    promoCode?: string;
   };
   clientSecret?: string;
   paymentIntentId?: string;
+}
+
+interface PromoValidationResult {
+  valid: boolean;
+  error?: string;
+  code?: string;
+  discountAmount?: number;
+  finalPrice?: number;
+  description?: string;
+  discountType?: 'percentage' | 'fixed';
+  discountValue?: number;
 }
 
 type BookingStep = "review" | "payment" | "confirmation";
@@ -54,6 +72,9 @@ export default function Booking() {
   const [step, setStep] = useState<BookingStep>("review");
   const [specialRequests, setSpecialRequests] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [promoCodeInput, setPromoCodeInput] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<PromoValidationResult | null>(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
 
   const { data: room, isLoading: isLoadingRoom } = useQuery<Room>({
     queryKey: [`/api/rooms/${roomId}`],
@@ -153,6 +174,58 @@ export default function Booking() {
 
   const nights = differenceInDays(checkOut, checkIn);
   const totalPrice = nights * room.pricePerNight;
+  const discountAmount = appliedPromo?.discountAmount || 0;
+  const finalPrice = appliedPromo?.finalPrice || totalPrice;
+
+  const handleValidatePromo = async () => {
+    if (!promoCodeInput.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a promo code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsValidatingPromo(true);
+    try {
+      const result = await api.post<PromoValidationResult>("/bookings/validate-promo", {
+        code: promoCodeInput.trim(),
+        bookingAmount: totalPrice,
+      });
+
+      if (result.valid) {
+        setAppliedPromo(result);
+        setPromoCodeInput("");
+        toast({
+          title: "Promo Applied!",
+          description: `You saved $${result.discountAmount?.toFixed(2)}`,
+        });
+      } else {
+        toast({
+          title: "Invalid Code",
+          description: result.error || "Unable to apply promo code",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to validate promo code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    toast({
+      title: "Promo Removed",
+      description: "Promo code has been removed",
+    });
+  };
 
   const handleCreateBooking = () => {
     if (!user) return;
@@ -163,9 +236,12 @@ export default function Booking() {
       checkInDate: checkIn,
       checkOutDate: checkOut,
       totalPrice,
+      finalPrice,
+      discountAmount,
       guestCount: guests,
       specialRequests: specialRequests || undefined,
-    });
+      promoCode: appliedPromo?.code,
+    } as any);
   };
 
   const handleConfirmPayment = () => {
@@ -287,6 +363,69 @@ export default function Booking() {
                     />
                   </div>
 
+                  <Separator />
+
+                  <div>
+                    <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+                      <Tag className="h-4 w-4" />
+                      Promo Code (optional)
+                    </label>
+                    {appliedPromo ? (
+                      <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 text-green-600" />
+                          <div>
+                            <span className="font-mono font-semibold text-green-700 dark:text-green-400" data-testid="text-applied-promo">
+                              {appliedPromo.code}
+                            </span>
+                            <span className="text-sm text-green-600 dark:text-green-400 ml-2">
+                              ({appliedPromo.discountType === 'percentage' 
+                                ? `${appliedPromo.discountValue}% off` 
+                                : `$${appliedPromo.discountValue} off`})
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleRemovePromo}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-900"
+                          data-testid="button-remove-promo"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter promo code"
+                          value={promoCodeInput}
+                          onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                          className="uppercase"
+                          data-testid="input-promo-code"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleValidatePromo();
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={handleValidatePromo}
+                          disabled={isValidatingPromo || !promoCodeInput.trim()}
+                          data-testid="button-apply-promo"
+                        >
+                          {isValidatingPromo ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            "Apply"
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
                   <Button
                     className="w-full"
                     size="lg"
@@ -343,7 +482,7 @@ export default function Booking() {
                     {confirmPaymentMutation.isPending && (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     )}
-                    Confirm Payment (${totalPrice})
+                    Confirm Payment (${finalPrice.toFixed(2)})
                   </Button>
                 </CardContent>
               </Card>
@@ -429,11 +568,30 @@ export default function Booking() {
                     <span>${room.pricePerNight} x {nights} nights</span>
                     <span>${totalPrice}</span>
                   </div>
+                  {appliedPromo && (
+                    <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                      <span className="flex items-center gap-1">
+                        <Tag className="h-3 w-3" />
+                        {appliedPromo.code} 
+                        <span className="text-muted-foreground">
+                          ({appliedPromo.discountType === 'percentage' 
+                            ? `${appliedPromo.discountValue}%` 
+                            : `$${appliedPromo.discountValue}`})
+                        </span>
+                      </span>
+                      <span data-testid="text-discount-amount">-${discountAmount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <Separator />
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Total</span>
-                    <span>${totalPrice}</span>
+                    <span data-testid="text-final-price">${finalPrice.toFixed(2)}</span>
                   </div>
+                  {appliedPromo && (
+                    <p className="text-xs text-green-600 dark:text-green-400 text-right">
+                      You save ${discountAmount.toFixed(2)}!
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -81,10 +81,19 @@ Preferred communication style: Simple, everyday language.
 - Images stored as URL strings (path to uploaded files)
 
 **Booking Model**
-- Fields: userId (ref), roomId (ref), checkInDate, checkOutDate, totalPrice, status, guestCount, specialRequests, paymentIntentId, paymentStatus, createdAt
+- Fields: userId (ref), roomId (ref), checkInDate, checkOutDate, totalPrice, discountAmount, finalPrice, promoCode, status, guestCount, specialRequests, paymentIntentId, paymentStatus, createdAt
 - Status types: pending, confirmed, checked_in, checked_out, cancelled
 - Payment status: pending, paid, refunded
+- Promo code support with discount tracking (discountAmount, finalPrice fields)
+- Pre-save hook auto-calculates finalPrice if not set
 - Populated references for user and room details in responses
+
+**PromoCode Model**
+- Fields: code (unique), description, discountType (percentage/fixed), discountValue, minBookingAmount, maxDiscountAmount, validFrom, validTo, usageLimit, usageCount, isActive, createdAt
+- Supports percentage and fixed discount types
+- Usage tracking with optional limits
+- Date range validation for validity period
+- Minimum booking amount requirement support
 
 **Review Model**
 - Fields: userId (ref), roomId (ref), bookingId (ref, unique), rating (1-5), comment, createdAt
@@ -146,5 +155,7 @@ Preferred communication style: Simple, everyday language.
 ### File Processing
 - **Multer**: Multipart form data and file uploads
 
-### Potential Payment Integration
-- Payment-related fields exist in booking model (paymentIntentId, paymentStatus) suggesting future Stripe or similar integration, though not currently implemented
+### Payment Integration
+- Stripe integration for payment processing (test mode)
+- Payment-related fields in booking model (paymentIntentId, paymentStatus)
+- Simulated payment flow in development with actual Stripe in production

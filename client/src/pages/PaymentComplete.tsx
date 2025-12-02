@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import PaymentForm from "@/components/PaymentForm";
 import type { BookingWithDetails } from "@shared/schema";
 
 export default function PaymentComplete() {
@@ -173,36 +174,24 @@ export default function PaymentComplete() {
                 <Alert>
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    This is a test environment. No real payment will be processed.
-                    Click "Confirm Payment" to simulate a successful payment.
+                    This is a test environment. Use card number <strong>4242 4242 4242 4242</strong> with any expiry and CVC.
                   </AlertDescription>
                 </Alert>
 
-                <div className="p-6 border rounded-lg bg-muted/50">
-                  <p className="text-center text-muted-foreground mb-4">
-                    Stripe Payment Form would appear here in production
-                  </p>
-                  <div className="space-y-4">
-                    <div className="h-10 bg-muted rounded-md" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="h-10 bg-muted rounded-md" />
-                      <div className="h-10 bg-muted rounded-md" />
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={() => confirmPaymentMutation.mutate()}
-                  disabled={confirmPaymentMutation.isPending}
-                  data-testid="button-confirm-payment"
-                >
-                  {confirmPaymentMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Confirm Payment (${booking.totalPrice})
-                </Button>
+                <PaymentForm
+                  bookingId={bookingId || ''}
+                  amount={booking.totalPrice}
+                  onSuccess={() => {
+                    confirmPaymentMutation.mutate();
+                  }}
+                  onError={(error) => {
+                    toast({
+                      title: "Payment Error",
+                      description: error,
+                      variant: "destructive",
+                    });
+                  }}
+                />
               </CardContent>
             </Card>
           </div>

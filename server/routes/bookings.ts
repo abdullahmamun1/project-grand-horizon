@@ -23,21 +23,58 @@ router.get('/my', async (req: AuthRequest, res: Response) => {
       .populate('roomId')
       .sort({ createdAt: -1 });
 
-    const bookingsWithDetails = bookings.map((booking) => ({
-      ...booking.toJSON(),
-      room: booking.roomId,
+    const bookingsWithDetails = bookings.map((booking) => {
+      const bookingObj = booking.toJSON();
+      const room = booking.roomId as any;
+      return {
+        ...bookingObj,
+        roomId: room?._id?.toString() || bookingObj.roomId,
+        room: room,
+        user: {
+          _id: req.user!._id.toString(),
+          firstName: req.user!.firstName,
+          lastName: req.user!.lastName,
+          email: req.user!.email,
+        },
+      };
+    });
+
+    res.json(bookingsWithDetails);
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+    res.status(500).json({ message: 'Failed to fetch bookings' });
+  }
+});
+
+router.get('/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const booking = await Booking.findOne({
+      _id: req.params.id,
+      userId: req.user!._id,
+    }).populate('roomId');
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const bookingObj = booking.toJSON();
+    const room = booking.roomId as any;
+    const bookingWithDetails = {
+      ...bookingObj,
+      roomId: room?._id?.toString() || bookingObj.roomId,
+      room: room,
       user: {
         _id: req.user!._id.toString(),
         firstName: req.user!.firstName,
         lastName: req.user!.lastName,
         email: req.user!.email,
       },
-    }));
+    };
 
-    res.json(bookingsWithDetails);
+    res.json(bookingWithDetails);
   } catch (error) {
-    console.error('Error fetching bookings:', error);
-    res.status(500).json({ message: 'Failed to fetch bookings' });
+    console.error('Error fetching booking:', error);
+    res.status(500).json({ message: 'Failed to fetch booking' });
   }
 });
 

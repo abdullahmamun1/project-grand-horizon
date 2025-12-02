@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Loader2,
   Hotel,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -131,12 +132,21 @@ function BookingCard({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/rooms/${booking.roomId}`} data-testid={`link-view-room-${booking._id}`}>
-                View Room
-                <ArrowRight className="ml-2 h-3 w-3" />
-              </Link>
-            </Button>
+            {booking.status === "pending" ? (
+              <Button size="sm" asChild>
+                <Link href={`/payment/${booking._id}`} data-testid={`link-go-to-payment-${booking._id}`}>
+                  <CreditCard className="mr-2 h-3 w-3" />
+                  Go to Payment
+                </Link>
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/rooms/${booking.room?._id || booking.roomId}`} data-testid={`link-view-room-${booking._id}`}>
+                  View Room
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            )}
             {canCancel && (
               <Button
                 variant="outline"

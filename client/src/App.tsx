@@ -13,6 +13,7 @@ import Home from "@/pages/Home";
 import Rooms from "@/pages/Rooms";
 import RoomDetail from "@/pages/RoomDetail";
 import Booking from "@/pages/Booking";
+import PaymentComplete from "@/pages/PaymentComplete";
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/auth/Login";
 import Register from "@/pages/auth/Register";
@@ -63,6 +64,13 @@ function Router() {
         <ProtectedRoute>
           <PublicLayout>
             <Booking />
+          </PublicLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/payment/:bookingId">
+        <ProtectedRoute>
+          <PublicLayout>
+            <PaymentComplete />
           </PublicLayout>
         </ProtectedRoute>
       </Route>

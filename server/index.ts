@@ -4,17 +4,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const envPath = path.resolve(__dirname, "../.env");
-
-console.log("Looking for .env file at:", envPath);
-const result = config({ path: envPath });
-
-if (result.error) {
-  console.log(".env file not found or error loading:", result.error.message);
-} else {
-  console.log(".env file loaded successfully");
-  console.log("MONGODB_URI is set:", !!process.env.MONGODB_URI);
-}
+config({ path: path.resolve(__dirname, "../.env") });
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";

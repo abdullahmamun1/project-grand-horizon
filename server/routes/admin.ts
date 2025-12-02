@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { Room, Booking, User, Review } from '../db/models';
+import { Room, Booking, User, Review, PromoCode } from '../db/models';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
 
@@ -272,6 +272,162 @@ router.patch('/bookings/:id/status', async (req: AuthRequest, res: Response) => 
   } catch (error) {
     console.error('Error updating booking status:', error);
     res.status(500).json({ message: 'Failed to update status' });
+  }
+});
+
+// ============ PROMO CODE ROUTES ============
+const promoCodeSchema = z.object({
+  code: z.string().min(3).max(20),
+  description: z.string().optional(),
+  discountType: z.enum(['percentage', 'fixed']),
+  discountValue: z.number().positive(),
+  minBookingAmount: z.number().min(0).default(0),
+  maxDiscountAmount: z.number().positive().optional(),
+  validFrom: z.string().transform((str) => new Date(str)),
+  validTo: z.string().transform((str) => new Date(str)),
+  usageLimit: z.number().int().positive().optional(),
+  isActive: z.boolean().default(true),
+});
+
+router.get('/promo-codes', async (req: AuthRequest, res: Response) => {
+  try {
+    const promoCodes = await PromoCode.find().sort({ createdAt: -1 });
+    res.json(promoCodes);
+  } catch (error) {
+    console.error('Error fetching promo codes:', error);
+    res.status(500).json({ message: 'Failed to fetch promo codes' });
+  }
+});
+
+router.get('/promo-codes/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const promoCode = await PromoCode.findById(req.params.id);
+    if (!promoCode) {
+      return res.status(404).json({ message: 'Promo code not found' });
+    }
+    res.json(promoCode.toJSON());
+  } catch (error) {
+    console.error('Error fetching promo code:', error);
+    res.status(500).json({ message: 'Failed to fetch promo code' });
+  }
+});
+
+router.post('/promo-codes', async (req: AuthRequest, res: Response) => {
+  try {
+    const validation = promoCodeSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Check if code already exists
+    const existingCode = await PromoCode.findOne({ 
+      code: data.code.toUpperCase() 
+    });
+    if (existingCode) {
+      return res.status(400).json({ message: 'Promo code already exists' });
+    }
+
+    // Validate dates
+    if (data.validTo <= data.validFrom) {
+      return res.status(400).json({ message: 'End date must be after start date' });
+    }
+
+    // Validate percentage discount
+    if (data.discountType === 'percentage' && data.discountValue > 100) {
+      return res.status(400).json({ message: 'Percentage discount cannot exceed 100%' });
+    }
+
+    const promoCode = new PromoCode({
+      ...data,
+      code: data.code.toUpperCase(),
+    });
+    await promoCode.save();
+
+    res.status(201).json(promoCode.toJSON());
+  } catch (error) {
+    console.error('Error creating promo code:', error);
+    res.status(500).json({ message: 'Failed to create promo code' });
+  }
+});
+
+router.put('/promo-codes/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const validation = promoCodeSchema.partial().safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Check if new code already exists (if code is being updated)
+    if (data.code) {
+      const existingCode = await PromoCode.findOne({ 
+        code: data.code.toUpperCase(),
+        _id: { $ne: req.params.id }
+      });
+      if (existingCode) {
+        return res.status(400).json({ message: 'Promo code already exists' });
+      }
+      data.code = data.code.toUpperCase();
+    }
+
+    // Validate percentage discount
+    if (data.discountType === 'percentage' && data.discountValue && data.discountValue > 100) {
+      return res.status(400).json({ message: 'Percentage discount cannot exceed 100%' });
+    }
+
+    const promoCode = await PromoCode.findByIdAndUpdate(
+      req.params.id,
+      data,
+      { new: true }
+    );
+
+    if (!promoCode) {
+      return res.status(404).json({ message: 'Promo code not found' });
+    }
+
+    res.json(promoCode.toJSON());
+  } catch (error) {
+    console.error('Error updating promo code:', error);
+    res.status(500).json({ message: 'Failed to update promo code' });
+  }
+});
+
+router.delete('/promo-codes/:id', async (req: AuthRequest, res: Response) => {
+  try {
+    const promoCode = await PromoCode.findByIdAndDelete(req.params.id);
+    if (!promoCode) {
+      return res.status(404).json({ message: 'Promo code not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting promo code:', error);
+    res.status(500).json({ message: 'Failed to delete promo code' });
+  }
+});
+
+router.patch('/promo-codes/:id/toggle', async (req: AuthRequest, res: Response) => {
+  try {
+    const promoCode = await PromoCode.findById(req.params.id);
+    if (!promoCode) {
+      return res.status(404).json({ message: 'Promo code not found' });
+    }
+
+    promoCode.isActive = !promoCode.isActive;
+    await promoCode.save();
+
+    res.json(promoCode.toJSON());
+  } catch (error) {
+    console.error('Error toggling promo code:', error);
+    res.status(500).json({ message: 'Failed to toggle promo code' });
   }
 });
 

@@ -3,15 +3,27 @@ import { IBooking } from '../db/models/Booking';
 import { IRoom } from '../db/models/Room';
 import { IUser } from '../db/models/User';
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+let transporter: nodemailer.Transporter | null = null;
+
+function getTransporter() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+  
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+  }
+  
+  return transporter;
+}
 
 export async function sendBookingConfirmation(
   user: IUser,
@@ -128,7 +140,14 @@ export async function sendBookingConfirmation(
   };
 
   try {
-    await transporter.sendMail(mailOptions);
+    const mailTransporter = getTransporter();
+    
+    if (!mailTransporter) {
+      console.log('Email not configured (SMTP_USER/SMTP_PASS not set) - skipping email notification');
+      return;
+    }
+    
+    await mailTransporter.sendMail(mailOptions);
     console.log('Booking confirmation email sent to:', user.email);
   } catch (error) {
     console.error('Failed to send booking confirmation email:', error);

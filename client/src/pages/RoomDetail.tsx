@@ -38,7 +38,7 @@ export default function RoomDetail() {
   const [guests, setGuests] = useState(1);
 
   const { data: room, isLoading } = useQuery<RoomWithReviews>({
-    queryKey: ["/api/rooms", params?.id],
+    queryKey: [`/api/rooms/${params?.id}`],
     enabled: !!params?.id,
   });
 
@@ -97,15 +97,19 @@ export default function RoomDetail() {
     setLocation(`/booking?${bookingParams.toString()}`);
   };
 
+  const images = room?.images || [];
+  const reviews = room?.reviews || [];
+  const amenities = room?.amenities || [];
+
   const nextImage = () => {
     setCurrentImageIndex((prev) => 
-      prev === room.images.length - 1 ? 0 : prev + 1
+      prev === images.length - 1 ? 0 : prev + 1
     );
   };
 
   const prevImage = () => {
     setCurrentImageIndex((prev) => 
-      prev === 0 ? room.images.length - 1 : prev - 1
+      prev === 0 ? images.length - 1 : prev - 1
     );
   };
 
@@ -122,14 +126,14 @@ export default function RoomDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
             <div className="relative aspect-[16/9] rounded-xl overflow-hidden bg-muted">
-              {room.images.length > 0 ? (
+              {images.length > 0 ? (
                 <>
                   <img
-                    src={room.images[currentImageIndex]}
+                    src={images[currentImageIndex]}
                     alt={`${room.name} - Image ${currentImageIndex + 1}`}
                     className="w-full h-full object-cover"
                   />
-                  {room.images.length > 1 && (
+                  {images.length > 1 && (
                     <>
                       <Button
                         variant="secondary"
@@ -150,7 +154,7 @@ export default function RoomDetail() {
                         <ChevronRight className="h-4 w-4" />
                       </Button>
                       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-                        {room.images.map((_, index) => (
+                        {images.map((_, index) => (
                           <button
                             key={index}
                             onClick={() => setCurrentImageIndex(index)}
@@ -173,9 +177,9 @@ export default function RoomDetail() {
               )}
             </div>
 
-            {room.images.length > 1 && (
+            {images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2">
-                {room.images.map((image, index) => (
+                {images.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setCurrentImageIndex(index)}
@@ -211,7 +215,7 @@ export default function RoomDetail() {
                       {room.averageRating.toFixed(1)}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      ({room.reviews.length} reviews)
+                      ({reviews.length} reviews)
                     </span>
                   </div>
                 )}
@@ -237,7 +241,7 @@ export default function RoomDetail() {
             <div>
               <h2 className="text-xl font-semibold mb-4">Amenities</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {room.amenities.map((amenity) => (
+                {amenities.map((amenity) => (
                   <div
                     key={amenity}
                     className="flex items-center gap-2 p-3 rounded-lg bg-muted"
@@ -254,11 +258,11 @@ export default function RoomDetail() {
 
             <div>
               <h2 className="text-xl font-semibold mb-4">
-                Reviews ({room.reviews.length})
+                Reviews ({reviews.length})
               </h2>
-              {room.reviews.length > 0 ? (
+              {reviews.length > 0 ? (
                 <div className="space-y-4">
-                  {room.reviews.map((review) => (
+                  {reviews.map((review) => (
                     <Card key={review._id} data-testid={`review-${review._id}`}>
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">

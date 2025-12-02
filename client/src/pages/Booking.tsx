@@ -10,6 +10,7 @@ import {
   Check,
   Loader2,
   AlertCircle,
+  Bed,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,7 +56,7 @@ export default function Booking() {
   const [bookingId, setBookingId] = useState<string | null>(null);
 
   const { data: room, isLoading: isLoadingRoom } = useQuery<Room>({
-    queryKey: ["/api/rooms", roomId],
+    queryKey: [`/api/rooms/${roomId}`],
     enabled: !!roomId,
   });
 
@@ -226,12 +227,16 @@ export default function Booking() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="flex gap-4">
-                    {room.images[0] && (
+                    {room.images && room.images.length > 0 ? (
                       <img
                         src={room.images[0]}
                         alt={room.name}
                         className="w-32 h-24 object-cover rounded-lg"
                       />
+                    ) : (
+                      <div className="w-32 h-24 bg-muted rounded-lg flex items-center justify-center">
+                        <Bed className="h-8 w-8 text-muted-foreground" />
+                      </div>
                     )}
                     <div>
                       <h3 className="font-semibold text-lg">{room.name}</h3>
@@ -379,12 +384,16 @@ export default function Booking() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex gap-4">
-                  {room.images[0] && (
+                  {room.images && room.images.length > 0 ? (
                     <img
                       src={room.images[0]}
                       alt={room.name}
                       className="w-20 h-20 object-cover rounded-lg"
                     />
+                  ) : (
+                    <div className="w-20 h-20 bg-muted rounded-lg flex items-center justify-center">
+                      <Bed className="h-6 w-6 text-muted-foreground" />
+                    </div>
                   )}
                   <div>
                     <h3 className="font-semibold">{room.name}</h3>

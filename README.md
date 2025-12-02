@@ -170,10 +170,25 @@ VITE_STRIPE_PUBLIC_KEY=pk_test_your_stripe_public_key
 
 ### Step 6: Run the Application
 
-```cmd
-# Start the development server
-npm run dev
+**Option A: Using PowerShell (Recommended)**
+```powershell
+$env:NODE_ENV="development"; npx tsx server/index.ts
 ```
+
+**Option B: Using Command Prompt (cmd)**
+```cmd
+set NODE_ENV=development && npx tsx server/index.ts
+```
+
+**Option C: Create a batch file**
+
+Create a file named `start-dev.bat` in the project root with:
+```batch
+@echo off
+set NODE_ENV=development
+npx tsx server/index.ts
+```
+Then double-click the file or run `start-dev.bat` from Command Prompt.
 
 The application will start and be available at: **http://localhost:5000**
 

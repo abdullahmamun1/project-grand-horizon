@@ -30,7 +30,9 @@ export function Header() {
 
   const getInitials = () => {
     if (!user) return "U";
-    return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    const first = user.firstName?.[0] || "";
+    const last = user.lastName?.[0] || "";
+    return (first + last).toUpperCase() || "U";
   };
 
   return (

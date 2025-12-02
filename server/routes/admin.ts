@@ -53,6 +53,46 @@ const roomSchema = z.object({
   isAvailable: z.boolean().optional(),
 });
 
+router.get('/room-stats', async (req: AuthRequest, res: Response) => {
+  try {
+    const rooms = await Room.find().lean();
+    const occupiedBookings = await Booking.find({ status: 'checked_in' }).lean();
+    
+    const occupiedRoomIds = new Set(
+      occupiedBookings.map((b) => b.roomId.toString())
+    );
+
+    const categories = ['Standard', 'Deluxe', 'Suite', 'Executive', 'Presidential', 'Family', 'Penthouse'];
+    
+    const statsByCategory = categories.map((category) => {
+      const categoryRooms = rooms.filter((r) => r.category === category);
+      const totalRooms = categoryRooms.length;
+      const occupiedRooms = categoryRooms.filter((r) => occupiedRoomIds.has(r._id.toString())).length;
+      const availableRooms = categoryRooms.filter(
+        (r) => r.isAvailable && !occupiedRoomIds.has(r._id.toString())
+      ).length;
+
+      return {
+        category,
+        totalRooms,
+        availableRooms,
+        occupiedRooms,
+      };
+    });
+
+    const totals = {
+      totalRooms: rooms.length,
+      availableRooms: rooms.filter((r) => r.isAvailable && !occupiedRoomIds.has(r._id.toString())).length,
+      occupiedRooms: occupiedRoomIds.size,
+    };
+
+    res.json({ statsByCategory, totals });
+  } catch (error) {
+    console.error('Error fetching room stats:', error);
+    res.status(500).json({ message: 'Failed to fetch room statistics' });
+  }
+});
+
 router.get('/stats', async (req: AuthRequest, res: Response) => {
   try {
     const [totalRooms, totalBookings, revenueAgg, checkedInCount] = await Promise.all([

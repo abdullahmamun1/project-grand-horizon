@@ -12,6 +12,9 @@ import {
   X,
   Search,
   Image as ImageIcon,
+  Building,
+  CheckCircle,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,6 +75,22 @@ const roomFormSchema = insertRoomSchema.extend({
 
 type RoomFormData = z.infer<typeof roomFormSchema>;
 
+interface CategoryStats {
+  category: string;
+  totalRooms: number;
+  availableRooms: number;
+  occupiedRooms: number;
+}
+
+interface RoomStats {
+  statsByCategory: CategoryStats[];
+  totals: {
+    totalRooms: number;
+    availableRooms: number;
+    occupiedRooms: number;
+  };
+}
+
 export default function AdminRooms() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -86,6 +105,10 @@ export default function AdminRooms() {
 
   const { data: rooms, isLoading } = useQuery<Room[]>({
     queryKey: ["/api/admin/rooms"],
+  });
+
+  const { data: roomStats, isLoading: statsLoading } = useQuery<RoomStats>({
+    queryKey: ["/api/admin/room-stats"],
   });
 
   const form = useForm<RoomFormData>({
@@ -110,6 +133,7 @@ export default function AdminRooms() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/room-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
       toast({ title: "Room created successfully" });
       handleCloseDialog();
@@ -129,6 +153,7 @@ export default function AdminRooms() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/room-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
       toast({ title: "Room updated successfully" });
       handleCloseDialog();
@@ -148,6 +173,7 @@ export default function AdminRooms() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/room-stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
       toast({ title: "Room deleted successfully" });
       setDeleteRoomId(null);
@@ -297,6 +323,77 @@ export default function AdminRooms() {
           Add Room
         </Button>
       </div>
+
+      {/* Room Statistics by Category */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Room Statistics by Category</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {statsLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              {[...Array(7)].map((_, i) => (
+                <Skeleton key={i} className="h-24" />
+              ))}
+            </div>
+          ) : roomStats ? (
+            <>
+              {/* Overall Totals */}
+              <div className="flex flex-wrap items-center gap-4 mb-4 pb-4 border-b">
+                <div className="flex items-center gap-2">
+                  <Building className="h-5 w-5 text-primary" />
+                  <span className="text-sm text-muted-foreground">Total:</span>
+                  <span className="font-semibold" data-testid="text-total-rooms">{roomStats.totals.totalRooms}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-sm text-muted-foreground">Available:</span>
+                  <span className="font-semibold text-green-600" data-testid="text-available-rooms">{roomStats.totals.availableRooms}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-orange-500" />
+                  <span className="text-sm text-muted-foreground">Occupied:</span>
+                  <span className="font-semibold text-orange-600" data-testid="text-occupied-rooms">{roomStats.totals.occupiedRooms}</span>
+                </div>
+              </div>
+
+              {/* Stats by Category */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                {roomStats.statsByCategory
+                  .filter((stat) => stat.totalRooms > 0)
+                  .map((stat) => (
+                    <Card key={stat.category} className="bg-muted/30" data-testid={`card-stats-${stat.category}`}>
+                      <CardContent className="p-4 text-center">
+                        <h4 className="font-medium text-sm mb-2 truncate" title={stat.category}>
+                          {stat.category}
+                        </h4>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between gap-1">
+                            <span className="text-muted-foreground">Total:</span>
+                            <span className="font-semibold">{stat.totalRooms}</span>
+                          </div>
+                          <div className="flex justify-between gap-1">
+                            <span className="text-muted-foreground">Available:</span>
+                            <span className="font-semibold text-green-600">{stat.availableRooms}</span>
+                          </div>
+                          <div className="flex justify-between gap-1">
+                            <span className="text-muted-foreground">Occupied:</span>
+                            <span className="font-semibold text-orange-600">{stat.occupiedRooms}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                {roomStats.statsByCategory.every((stat) => stat.totalRooms === 0) && (
+                  <p className="col-span-full text-center text-muted-foreground py-4">
+                    No rooms added yet.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

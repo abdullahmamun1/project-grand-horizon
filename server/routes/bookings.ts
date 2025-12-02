@@ -1,8 +1,59 @@
 import { Router, Response } from 'express';
-import { Booking, Room, User } from '../db/models';
+import { Booking, Room, User, PromoCode } from '../db/models';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { sendBookingConfirmation } from '../services/email';
 import { z } from 'zod';
+
+// Helper function to validate and calculate promo code discount
+async function validatePromoCode(code: string, bookingAmount: number) {
+  const promoCode = await PromoCode.findOne({ 
+    code: code.toUpperCase(),
+    isActive: true,
+  });
+
+  if (!promoCode) {
+    return { valid: false, error: 'Invalid promo code' };
+  }
+
+  const now = new Date();
+  if (now < promoCode.validFrom || now > promoCode.validTo) {
+    return { valid: false, error: 'Promo code has expired or is not yet active' };
+  }
+
+  if (promoCode.usageLimit && promoCode.usageCount >= promoCode.usageLimit) {
+    return { valid: false, error: 'Promo code has reached its usage limit' };
+  }
+
+  if (bookingAmount < promoCode.minBookingAmount) {
+    return { 
+      valid: false, 
+      error: `Minimum booking amount of $${promoCode.minBookingAmount} required` 
+    };
+  }
+
+  let discountAmount = 0;
+  if (promoCode.discountType === 'percentage') {
+    discountAmount = (bookingAmount * promoCode.discountValue) / 100;
+  } else {
+    discountAmount = promoCode.discountValue;
+  }
+
+  if (promoCode.maxDiscountAmount && discountAmount > promoCode.maxDiscountAmount) {
+    discountAmount = promoCode.maxDiscountAmount;
+  }
+
+  discountAmount = Math.min(discountAmount, bookingAmount);
+
+  return {
+    valid: true,
+    promoCode,
+    discountAmount: Math.round(discountAmount * 100) / 100,
+    finalPrice: Math.round((bookingAmount - discountAmount) * 100) / 100,
+    description: promoCode.description,
+    discountType: promoCode.discountType,
+    discountValue: promoCode.discountValue,
+  };
+}
 
 const router = Router();
 
@@ -13,9 +64,44 @@ const createBookingSchema = z.object({
   totalPrice: z.number().positive(),
   guestCount: z.number().int().positive(),
   specialRequests: z.string().optional(),
+  promoCode: z.string().optional(),
 });
 
 router.use(authenticate);
+
+// Validate promo code endpoint
+router.post('/validate-promo', async (req: AuthRequest, res: Response) => {
+  try {
+    const { code, bookingAmount } = req.body;
+    
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ valid: false, error: 'Promo code is required' });
+    }
+    
+    if (!bookingAmount || typeof bookingAmount !== 'number' || bookingAmount <= 0) {
+      return res.status(400).json({ valid: false, error: 'Valid booking amount is required' });
+    }
+
+    const result = await validatePromoCode(code, bookingAmount);
+    
+    if (!result.valid) {
+      return res.json({ valid: false, error: result.error });
+    }
+
+    res.json({
+      valid: true,
+      code: result.promoCode!.code,
+      discountAmount: result.discountAmount,
+      finalPrice: result.finalPrice,
+      description: result.description,
+      discountType: result.discountType,
+      discountValue: result.discountValue,
+    });
+  } catch (error) {
+    console.error('Error validating promo code:', error);
+    res.status(500).json({ valid: false, error: 'Failed to validate promo code' });
+  }
+});
 
 router.get('/my', async (req: AuthRequest, res: Response) => {
   try {
@@ -106,12 +192,35 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: 'Room is not available for selected dates' });
     }
 
+    let discountAmount = 0;
+    let finalPrice = data.totalPrice;
+    let appliedPromoCode: string | undefined = undefined;
+
+    // Validate and apply promo code if provided
+    if (data.promoCode) {
+      const promoResult = await validatePromoCode(data.promoCode, data.totalPrice);
+      if (!promoResult.valid) {
+        return res.status(400).json({ message: promoResult.error });
+      }
+      discountAmount = promoResult.discountAmount!;
+      finalPrice = promoResult.finalPrice!;
+      appliedPromoCode = promoResult.promoCode!.code;
+
+      // Increment promo code usage count
+      await PromoCode.findByIdAndUpdate(promoResult.promoCode!._id, {
+        $inc: { usageCount: 1 }
+      });
+    }
+
     const booking = new Booking({
       userId: req.user!._id,
       roomId: data.roomId,
       checkInDate: data.checkInDate,
       checkOutDate: data.checkOutDate,
       totalPrice: data.totalPrice,
+      discountAmount,
+      finalPrice,
+      promoCode: appliedPromoCode,
       guestCount: data.guestCount,
       specialRequests: data.specialRequests,
       status: 'pending',

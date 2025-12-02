@@ -91,15 +91,15 @@ npx tsx server/scripts/seed.ts
 
 ## Test Accounts
 
-After seeding, you can use these accounts:
+Use these accounts to test the application (all use the same password):
 
-**Admin:**
-- Email: admin_test125@test.com
-- Password: testpassword123
+**Password for all accounts:** `Test@123`
 
-**Sample Customers:**
-- Email: customer1@example.com through customer5@example.com
-- Password: password123
+| Role | Email | Access |
+|------|-------|--------|
+| Admin | admin@grandhorizon.com | Full system access, room management, user management |
+| Manager | manager@grandhorizon.com | Booking management, status updates |
+| Customer | guest@grandhorizon.com | Room browsing, booking, reviews |
 
 ## API Endpoints
 

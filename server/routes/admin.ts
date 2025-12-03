@@ -1,27 +1,14 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
-import fs from 'fs';
 import { Room, Booking, User, Review, PromoCode } from '../db/models';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { uploadImage } from '../services/cloudinary';
 import { z } from 'zod';
 
 const router = Router();
 
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  },
-});
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -219,7 +206,9 @@ router.post('/upload', upload.array('images', 5), async (req: Request, res: Resp
       return res.status(400).json({ message: 'No files uploaded' });
     }
 
-    const urls = files.map((file) => `/uploads/${file.filename}`);
+    const uploadPromises = files.map((file) => uploadImage(file.buffer, 'hotel-rooms'));
+    const urls = await Promise.all(uploadPromises);
+    
     res.json({ urls });
   } catch (error) {
     console.error('Error uploading files:', error);

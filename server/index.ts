@@ -108,14 +108,13 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+
   const port = parseInt(process.env.PORT || "5000", 10);
   
-  // Use 0.0.0.0 on Replit/Linux, localhost on Windows for local development
-  const isReplit = process.env.REPL_ID || process.env.REPLIT;
-  const host = isReplit ? "0.0.0.0" : "localhost";
+  // Always bind to 0.0.0.0 in production (Render, etc.) or on Replit
+  // Only use localhost for local Windows development
+  const isProduction = process.env.NODE_ENV === "production";
+  const host = (isProduction) ? "0.0.0.0" : "localhost";
   
   const listenOptions: { port: number; host: string; reusePort?: boolean } = {
     port,

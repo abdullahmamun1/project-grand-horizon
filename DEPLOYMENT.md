@@ -41,7 +41,7 @@ This guide explains how to deploy the application to **Vercel** (frontend) and *
    - **Name**: `grand-horizon-api`
    - **Root Directory**: Leave empty (uses root)
    - **Runtime**: Node
-   - **Build Command**: `npm install && npm run build`
+   - **Build Command**: `npm ci --include=dev && npm run build`
    - **Start Command**: `npm start`
 
 5. Add Environment Variables:

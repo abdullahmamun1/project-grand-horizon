@@ -1,10 +1,7 @@
 import { config } from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-config({ path: path.resolve(__dirname, "../.env") });
+// In production, env vars are set by hosting provider
+// In development, dotenv will load from .env file in current working directory
+config();
 
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";

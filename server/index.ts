@@ -121,10 +121,6 @@ app.use((req, res, next) => {
     host,
   };
   
-  // reusePort is not supported on Windows
-  if (isReplit) {
-    listenOptions.reusePort = true;
-  }
   
   httpServer.listen(listenOptions, () => {
     log(`serving on http://${host}:${port}`);
